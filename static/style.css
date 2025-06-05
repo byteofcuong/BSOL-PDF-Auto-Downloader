@@ -1,0 +1,148 @@
+body {
+    background: #10182a;
+    color: #e6e6e6;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 40px auto;
+    padding: 40px 30px;
+}
+
+.title {
+    color: #7ecbff;
+    font-size: 3.2rem;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 0.2em;
+}
+
+.subtitle {
+    text-align: center;
+    color: #b0b8d1;
+    font-size: 1.35rem;
+    margin-bottom: 2.5em;
+}
+
+.main {
+    display: flex;
+    gap: 48px;
+}
+
+.left,
+.right {
+    background: #181f36;
+    border-radius: 22px;
+    padding: 48px 38px;
+}
+
+.left {
+    flex: 2.5;
+    margin-bottom: 20px;
+    min-height: 430px;
+}
+
+.right {
+    flex: 1.2;
+    min-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+    min-height: 430px;
+}
+
+.section-title {
+    color: #7ecbff;
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+}
+
+.log-area {
+    background: #13192b;
+    border-radius: 12px;
+    min-height: 160px;
+    color: #b0b8d1;
+    font-family: 'Fira Mono', 'Consolas', monospace;
+    font-size: 1.08rem;
+    padding: 22px;
+    margin-bottom: 24px;
+    white-space: pre-line;
+}
+
+.stats {
+    display: flex;
+    gap: 28px;
+    margin-bottom: 24px;
+}
+
+.stat-box {
+    background: #232b47;
+    border-radius: 12px;
+    flex: 1;
+    text-align: center;
+    padding: 28px 0 16px 0;
+}
+
+.stat-label {
+    color: #b0b8d1;
+    font-size: 1.08rem;
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #7ecbff;
+}
+
+.stat-value.success {
+    color: #b97cff;
+}
+
+.file-list {
+    background: #13192b;
+    border-radius: 12px;
+    padding: 22px;
+    color: #b0b8d1;
+    min-height: 60px;
+    font-size: 1.08rem;
+}
+
+.download-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: linear-gradient(90deg, #1ec8e7 0%, #b97cff 100%);
+    color: #fff;
+    font-size: 1.18rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 12px;
+    padding: 22px 0;
+    width: 100%;
+    margin-top: 24px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.download-btn:hover {
+    background: linear-gradient(90deg, #1ec8e7 10%, #7ecbff 90%);
+}
+
+.icon {
+    font-size: 1.5em;
+}
+
+@media (max-width: 1100px) {
+    .main {
+        flex-direction: column;
+    }
+
+    .container {
+        padding: 20px 5vw;
+    }
+}

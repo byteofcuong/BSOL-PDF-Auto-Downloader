@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <title>BSOL PDF Auto Downloader</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+</head>
+
+<body>
+    <div class="container">
+        <div class="title">BSOL PDF Auto Downloader</div>
+        <div class="subtitle">Công cụ tự động tải xuống tất cả các file PDF từ trang web hiện tại với chỉ một cú nhấp
+            chuột</div>
+        <div class="main">
+            <div class="left">
+                <div class="section-title"><i class="fa-solid fa-download"></i> Tiến trình tải xuống</div>
+                <div style="color:#7ecbff; margin-bottom:8px;">Theo dõi quá trình tải xuống các file PDF</div>
+                <div class="log-area" id="log-area">{{ log if log else 'Nhật ký sẽ hiển thị ở đây khi bắt đầu tải
+                    xuống...' }}</div>
+                {% if not session.get('browser_started') %}
+                <form method="POST">
+                    <button class="download-btn" type="submit" name="action" value="start_browser">
+                        <i class="fa-brands fa-chrome icon"></i> Bắt đầu (Chrome)
+                    </button>
+                </form>
+                {% else %}
+                <form method="POST">
+                    <button class="download-btn" type="submit" name="action" value="download">
+                        <i class="fa-solid fa-download icon"></i> Bắt đầu tải file PDF trên trang hiện tại
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            <div class="right">
+                <div>
+                    <div class="section-title">Thống kê</div>
+                    <div class="stats">
+                        <div class="stat-box">
+                            <div class="stat-label">File đã tải</div>
+                            <div class="stat-value">{{ files_downloaded if files_downloaded is defined else 0 }}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Tỉ lệ thành công</div>
+                            <div class="stat-value success">{{ success_rate if success_rate is defined else '100%' }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="section-title" style="color:#ff7e7e;"><i class="fa-solid fa-triangle-exclamation"></i>
+                        File lỗi khi tải xuống</div>
+                    <div class="file-list" style="border: 1px solid #ff7e7e;">
+                        {% if failed_files_list and failed_files_list|length > 0 %}
+                        {% for file in failed_files_list %}
+                        <div>{{ file }}</div>
+                        {% endfor %}
+                        {% else %}
+                        <span>Không có file lỗi nào</span>
+                        {% endif %}
+                    </div>
+                    <div style="color:#b0b8d1; font-size:0.95em; margin-top:8px;">File sẽ lưu vào thư mục
+                        <b>Downloads/BSOL Downloads</b> trên máy bạn.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

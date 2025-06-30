@@ -131,7 +131,6 @@ def index():
                         log += f"Không click được một nút download: {e}\n"
                         failed_files += 1
                         page_failed += 1
-                        write_progress(current_page, idx)
                 log += f"Tổng kết trang {current_page}: {page_success} file thành công, {page_failed} file lỗi.\n"
                 try:
                     next_btn = driver.find_element(By.ID, "next-page")

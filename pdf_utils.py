@@ -50,4 +50,14 @@ def read_progress():
 
 def write_progress(page, idx):
     with open(PROGRESS_PATH, "w", encoding="utf-8") as f:
-        f.write(f"{page}|{idx}\n") 
+        f.write(f"{page}|{idx}\n")
+
+def cut_filename(filename):
+    """
+    Cắt tên file, chỉ lấy phần trước '--' đầu tiên và giữ lại đuôi .pdf (nếu có).
+    Ví dụ: '25-30516459 DC--[2025-06-28--09-12-50 AM].pdf' -> '25-30516459 DC.pdf'
+    """
+    name, ext = os.path.splitext(filename)
+    if '--' in name:
+        name = name.split('--', 1)[0].strip()
+    return f"{name}{ext}" 

@@ -1,7 +1,7 @@
 from flask import Flask, request, render_template, session
 from pdf_utils import (
     get_latest_pdf_filename, get_pdf_checksum, read_downloaded_files, write_downloaded_file,
-    read_checksums, write_checksum, read_progress, write_progress
+    read_checksums, write_checksum, read_progress, write_progress, cut_filename
 )
 from selenium_utils import get_pdf_buttons_hash, get_current_page_number
 from config import SECRET_KEY, PDF_DIR, DOWNLOADED_FILES_PATH, CHECKSUMS_PATH, PROGRESS_PATH, DOWNLOAD_DIR
@@ -102,28 +102,29 @@ def index():
                         time.sleep(delay)
                         latest_file = get_latest_pdf_filename()
                         if latest_file:
+                            logic_file = cut_filename(latest_file)
                             latest_path = os.path.join(PDF_DIR, latest_file)
                             latest_checksum = get_pdf_checksum(latest_path)
                             if latest_checksum in checksum_map:
-                                if latest_file != checksum_map[latest_checksum]:
-                                    log += f"File gốc: {latest_file} đã tồn tại (trùng nội dung), bỏ qua file này.\n"
+                                if logic_file != checksum_map[latest_checksum]:
+                                    log += f"File gốc: {logic_file} đã tồn tại (trùng nội dung), bỏ qua file này.\n"
                                     try:
                                         os.remove(latest_path)
                                     except Exception as e_rm:
-                                        log += f"Không xóa được file trùng: {latest_file}, lỗi: {e_rm}\n"
+                                        log += f"Không xóa được file trùng: {logic_file}, lỗi: {e_rm}\n"
                                 else:
-                                    log += f"File {latest_file} đã tồn tại đúng tên, bỏ qua.\n"
+                                    log += f"File {logic_file} đã tồn tại đúng tên, bỏ qua.\n"
                             else:
-                                if latest_file not in downloaded_files:
-                                    downloaded_files.add(latest_file)
-                                    write_downloaded_file(latest_file)
-                                    write_checksum(latest_checksum, latest_file)
-                                    checksum_map[latest_checksum] = latest_file
+                                if logic_file not in downloaded_files:
+                                    downloaded_files.add(logic_file)
+                                    write_downloaded_file(logic_file)
+                                    write_checksum(latest_checksum, logic_file)
+                                    checksum_map[latest_checksum] = logic_file
                                     total_files += 1
                                     page_success += 1
-                                    log += f"Đã tải thành công: {latest_file}\n"
+                                    log += f"Đã tải thành công: {logic_file}\n"
                                 else:
-                                    log += f"File gốc: {latest_file} đã tải trước đó, bỏ qua.\n"
+                                    log += f"File gốc: {logic_file} đã tải trước đó, bỏ qua.\n"
                         else:
                             log += f"Không xác định được tên file PDF vừa tải.\n"
                         write_progress(current_page, idx)

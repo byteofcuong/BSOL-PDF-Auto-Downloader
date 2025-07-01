@@ -1,5 +1,4 @@
 import os
-import hashlib
 from config import PDF_DIR, DOWNLOADED_FILES_PATH, CHECKSUMS_PATH, PROGRESS_PATH
 
 def get_latest_pdf_filename():
@@ -8,13 +7,6 @@ def get_latest_pdf_filename():
         return None
     latest_file = max([os.path.join(PDF_DIR, f) for f in pdf_files], key=os.path.getctime)
     return os.path.basename(latest_file)
-
-def get_pdf_checksum(filepath):
-    sha256 = hashlib.sha256()
-    with open(filepath, 'rb') as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            sha256.update(chunk)
-    return sha256.hexdigest()
 
 def read_downloaded_files():
     if os.path.exists(DOWNLOADED_FILES_PATH):
@@ -25,16 +17,6 @@ def read_downloaded_files():
 def write_downloaded_file(filename):
     with open(DOWNLOADED_FILES_PATH, "a", encoding="utf-8") as f:
         f.write(filename + "\n")
-
-def read_checksums():
-    if os.path.exists(CHECKSUMS_PATH):
-        with open(CHECKSUMS_PATH, "r", encoding="utf-8") as f:
-            return dict(line.strip().split("|", 1) for line in f if line.strip())
-    return dict()
-
-def write_checksum(checksum, filename):
-    with open(CHECKSUMS_PATH, "a", encoding="utf-8") as f:
-        f.write(f"{checksum}|{filename}\n")
 
 def read_progress():
     if os.path.exists(PROGRESS_PATH):
@@ -53,10 +35,6 @@ def write_progress(page, idx):
         f.write(f"{page}|{idx}\n")
 
 def cut_filename(filename):
-    """
-    Cắt tên file, chỉ lấy phần trước '--' đầu tiên và giữ lại đuôi .pdf (nếu có).
-    Ví dụ: '25-30516459 DC--[2025-06-28--09-12-50 AM].pdf' -> '25-30516459 DC.pdf'
-    """
     name, ext = os.path.splitext(filename)
     if '--' in name:
         name = name.split('--', 1)[0].strip()

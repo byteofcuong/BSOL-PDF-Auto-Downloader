@@ -8,6 +8,7 @@ from config import SECRET_KEY, PDF_DIR, DOWNLOADED_FILES_PATH, PROGRESS_PATH, DO
 import os
 import time
 import random
+from selenium.webdriver.common.by import By
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -71,7 +72,6 @@ def index():
             while True:
                 from selenium.webdriver.support.ui import WebDriverWait
                 from selenium.webdriver.support import expected_conditions as EC
-                from selenium.webdriver.common.by import By
                 from selenium.common.exceptions import TimeoutException
                 try:
                     WebDriverWait(driver, 20).until(
@@ -92,9 +92,9 @@ def index():
                 else:
                     log += f"Bắt đầu tải từ file đầu tiên trên trang {current_page}.\n"
                 pdf_buttons = driver.find_elements(By.CSS_SELECTOR, "input.download-pdf")
-                for idx, btn in enumerate(pdf_buttons, 0):
-                    if idx < start_idx:
-                        continue
+                idx = start_idx
+                while idx < len(pdf_buttons):
+                    btn = pdf_buttons[idx]
                     try:
                         btn.click()
                         delay = random.randint(10, 20)
@@ -118,10 +118,21 @@ def index():
                         else:
                             log += f"Không xác định được tên file PDF vừa tải.\n"
                         write_progress(current_page, idx)
+                        idx += 1
                     except Exception as e:
                         log += f"Không click được một nút download: {e}\n"
                         failed_files += 1
                         page_failed += 1
+                        log += "Chờ 30 giây trước khi thử lại...\n"
+                        time.sleep(30)
+                        idx -= 1
+                        if idx < start_idx:
+                            idx = start_idx
+                        log += "Quay lại trang trước...\n"
+                        driver.back()
+                        log += "Chờ 10 giây trước khi tiếp tục...\n"
+                        time.sleep(10)
+                        idx += 1
                 log += f"Tổng kết trang {current_page}: {page_success} file thành công, {page_failed} file lỗi.\n"
                 try:
                     next_btn = driver.find_element(By.ID, "next-page")

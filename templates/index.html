@@ -32,36 +32,37 @@
                 </form>
                 {% endif %}
             </div>
-            <div class="right">
+            <div class="right" style="max-width:420px;">
                 <div>
                     <div class="section-title">Thống kê</div>
                     <div class="stats">
                         <div class="stat-box">
-                            <div class="stat-label">File đã tải</div>
+                            <div class="stat-label">Tải thành công</div>
                             <div class="stat-value">{{ files_downloaded if files_downloaded is defined else 0 }}</div>
                         </div>
                         <div class="stat-box">
-                            <div class="stat-label">Tỉ lệ thành công</div>
-                            <div class="stat-value success">{{ success_rate if success_rate is defined else '100%' }}
-                            </div>
+                            <div class="stat-label">Lỗi tải xuống</div>
+                            <div class="stat-value error">{{ failed_files_list|length if failed_files_list is defined
+                                else 0 }}</div>
                         </div>
                     </div>
-                </div>
-                <div>
-                    <div class="section-title" style="color:#ff7e7e;"><i class="fa-solid fa-triangle-exclamation"></i>
-                        File lỗi khi tải xuống</div>
-                    <div class="file-list" style="border: 1px solid #ff7e7e;">
-                        {% if failed_files_list and failed_files_list|length > 0 %}
-                        {% for file in failed_files_list %}
-                        <div>{{ file }}</div>
-                        {% endfor %}
+                    {% if session.get('browser_started') %}
+                    <div style="margin-top: 10px;">
+                        {% if not session.get('is_paused') %}
+                        <form method="POST">
+                            <button class="download-btn" type="submit" name="action" value="pause">
+                                <i class="fa-solid fa-pause icon"></i> Tạm dừng
+                            </button>
+                        </form>
                         {% else %}
-                        <span>Không có file lỗi nào</span>
+                        <form method="POST">
+                            <button class="download-btn" type="submit" name="action" value="resume">
+                                <i class="fa-solid fa-play icon"></i> Tiếp tục
+                            </button>
+                        </form>
                         {% endif %}
                     </div>
-                    <div style="color:#b0b8d1; font-size:0.95em; margin-top:8px;">File sẽ lưu vào thư mục
-                        <b>Downloads/BSOL Downloads</b> trên máy bạn.
-                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

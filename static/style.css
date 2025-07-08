@@ -30,6 +30,9 @@ body {
 .main {
     display: flex;
     gap: 48px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
 }
 
 .left,
@@ -42,16 +45,19 @@ body {
 .left {
     flex: 2.5;
     margin-bottom: 20px;
-    min-height: 430px;
+    min-height: 380px;
 }
 
 .right {
     flex: 1.2;
     min-width: 320px;
+    max-width: 420px;
     display: flex;
     flex-direction: column;
     gap: 48px;
-    min-height: 430px;
+    min-height: 380px;
+    height: auto !important;
+    min-height: unset;
 }
 
 .section-title {
@@ -71,6 +77,8 @@ body {
     padding: 22px;
     margin-bottom: 24px;
     white-space: pre-line;
+    max-height: 220px;
+    overflow-y: auto;
 }
 
 .stats {

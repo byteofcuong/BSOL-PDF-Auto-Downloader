@@ -20,7 +20,6 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 os.makedirs(PDF_DIR, exist_ok=True)
 
 EXCEL_PATH = os.path.join(DOWNLOAD_DIR, "List.xlsx")
-# Tạo file excel mới nếu chưa có
 if not os.path.exists(EXCEL_PATH):
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -50,21 +49,16 @@ def wait_for_pdf_download(before_files, pdf_dir, safe_file_name, timeout=60):
     while time.time() - start < timeout:
         after_files = set(f for f in os.listdir(pdf_dir) if f.lower().endswith(".pdf") or f.lower().endswith(".crdownload"))
         new_files = after_files - before_files
-        # Tìm file .crdownload mới xuất hiện
         crdownloads = [f for f in new_files if f.endswith('.crdownload')]
         if crdownloads:
             crdownload_found = True
             crdownload_name = crdownloads[0]
-        # Nếu đã từng thấy file .crdownload, chờ nó biến mất
         if crdownload_found:
-            # Nếu file .crdownload đã biến mất
             if crdownload_name and not os.path.exists(os.path.join(pdf_dir, crdownload_name)):
-                # Kiểm tra các file PDF mới xuất hiện
                 pdf_candidates = [f for f in os.listdir(pdf_dir) if f.endswith('.pdf') and f not in before_files]
                 for f in pdf_candidates:
                     if strip_time_suffix(f) == safe_file_name:
                         return f
-                # Nếu chưa thấy file PDF đúng, chờ thêm
         time.sleep(1)
     return None
 
@@ -75,6 +69,11 @@ def index():
     files_downloaded = 0
     success_rate = "100%"
     failed_files_list = []
+
+    log_file_path = os.path.join(DOWNLOAD_DIR, "log.txt")
+    def write_log_to_file(msg):
+        with open(log_file_path, "a", encoding="utf-8") as f:
+            f.write(msg)
 
     if request.method == "GET":
         session['browser_started'] = False
@@ -88,17 +87,21 @@ def index():
             session['browser_started'] = True
             log += "Trình duyệt đã mở. Hãy tự login và thao tác đến đúng trang tài liệu bạn muốn tải.\n"
             log += "Khi đã ở đúng trang, quay lại đây và bấm 'Bắt đầu tải file PDF trên trang hiện tại'!"
+            write_log_to_file(log)
             return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
 
         elif action == "pause":
-            session['is_paused'] = True
+            with open("pause.flag", "w") as f:
+                f.write("paused")
             log += "Đã tạm dừng quá trình tải. Bạn có thể tiếp tục bất cứ lúc nào.\n"
+            write_log_to_file(log)
             return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
         elif action == "resume":
-            session['is_paused'] = False
+            if os.path.exists("pause.flag"):
+                os.remove("pause.flag")
             log += "Tiếp tục quá trình tải...\n"
+            write_log_to_file(log)
             action = "download"
-
         elif action == "download":
             if driver is None:
                 log += "Lỗi: Trình duyệt chưa được mở, hãy nhấn 'Bắt đầu' trước.\n"
@@ -132,6 +135,9 @@ def index():
                 blocks = driver.find_elements(By.CSS_SELECTOR, "#searchResultContainer > li")
                 block_found = False
                 for idx, block in enumerate(blocks):
+                    while os.path.exists("pause.flag"):
+                        log += "\nĐang tạm dừng..."
+                        time.sleep(5)
                     if last_page == get_current_page_number(driver) and idx <= last_block_idx:
                         continue
                     block_found = True
@@ -147,7 +153,6 @@ def index():
                         except Exception:
                             pass
                         ket_qua = None
-                        # Xác định trạng thái không được phép tải
                         if status.lower().find("not in your subscription") != -1 or status.lower().find("không trong subscription") != -1 or status.lower().find("không được phép tải") != -1:
                             ket_qua = ""
                         append_to_excel(safe_file_name, status, ket_qua)
@@ -157,7 +162,6 @@ def index():
                                 btn = block.find_element(By.CSS_SELECTOR, "input.download-pdf")
                                 if btn.is_enabled() and not btn.get_attribute("disabled"):
                                     btn.click()
-                                    # Chờ chắc chắn file .crdownload biến mất và file PDF mới xuất hiện đúng tên gốc
                                     pdf_file = wait_for_pdf_download(before_files, PDF_DIR, safe_file_name, timeout=60)
                                     if pdf_file:
                                         latest_path = os.path.join(PDF_DIR, pdf_file)
@@ -213,6 +217,7 @@ def index():
             else:
                 success_rate = "0%"
             log += "Đã tải xong tất cả các file PDF!\n"
+            write_log_to_file(log)
             return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
 
     return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)

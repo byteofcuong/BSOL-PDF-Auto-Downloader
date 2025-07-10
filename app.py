@@ -41,25 +41,17 @@ def strip_time_suffix(filename):
             return base[:idx] + '.pdf'
     return filename
 
-def wait_for_pdf_download(before_files, pdf_dir, safe_file_name, timeout=60):
+def wait_for_pdf_download(before_files, pdf_dir, safe_file_name, timeout=30):
     import time, os
     start = time.time()
-    crdownload_found = False
-    crdownload_name = None
     while time.time() - start < timeout:
-        after_files = set(f for f in os.listdir(pdf_dir) if f.lower().endswith(".pdf") or f.lower().endswith(".crdownload"))
+        after_files = set(f for f in os.listdir(pdf_dir) if f.lower().endswith(".pdf"))
         new_files = after_files - before_files
-        crdownloads = [f for f in new_files if f.endswith('.crdownload')]
-        if crdownloads:
-            crdownload_found = True
-            crdownload_name = crdownloads[0]
-        if crdownload_found:
-            if crdownload_name and not os.path.exists(os.path.join(pdf_dir, crdownload_name)):
-                pdf_candidates = [f for f in os.listdir(pdf_dir) if f.endswith('.pdf') and f not in before_files]
-                for f in pdf_candidates:
-                    if strip_time_suffix(f) == safe_file_name:
-                        return f
-        time.sleep(1)
+        if new_files:
+            newest_file = max(new_files, key=lambda f: os.path.getctime(os.path.join(pdf_dir, f)))
+            if strip_time_suffix(newest_file) == safe_file_name:
+                return newest_file
+        time.sleep(3)
     return None
 
 @app.route("/", methods=["GET", "POST"])
@@ -155,8 +147,8 @@ def index():
                         ket_qua = None
                         if status.lower().find("not in your subscription") != -1 or status.lower().find("không trong subscription") != -1 or status.lower().find("không được phép tải") != -1:
                             ket_qua = ""
-                        append_to_excel(safe_file_name, status, ket_qua)
-                        if safe_file_name not in downloaded_files:
+                            append_to_excel(safe_file_name, status, ket_qua)
+                        elif safe_file_name not in downloaded_files:
                             try:
                                 before_files = set(f for f in os.listdir(PDF_DIR) if f.lower().endswith(".pdf") or f.lower().endswith(".crdownload"))
                                 btn = block.find_element(By.CSS_SELECTOR, "input.download-pdf")
@@ -182,13 +174,16 @@ def index():
                                     append_to_excel(safe_file_name, status, ket_qua)
                                 else:
                                     log += f"File {safe_file_name} không được phép tải (nút download bị disable hoặc không trong subscription).\n"
+                                    ket_qua = ""
                                     append_to_excel(safe_file_name, status, ket_qua)
                             except Exception as e_btn:
                                 log += f"Không tìm thấy hoặc không click được nút download cho {safe_file_name}: {e_btn}\n"
-                                append_to_excel(safe_file_name, status, "Lỗi mạng")
+                                ket_qua = "Lỗi mạng"
+                                append_to_excel(safe_file_name, status, ket_qua)
                         else:
                             log += f"File {safe_file_name} đã tải trước đó, bỏ qua.\n"
-                            append_to_excel(safe_file_name, status, "Có")
+                            ket_qua = "Có"
+                            append_to_excel(safe_file_name, status, ket_qua)
                         write_progress(get_current_page_number(driver), idx)
                     except Exception as e:
                         log += f"Lỗi không xác định với block: {e}\n"

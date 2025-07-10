@@ -1,13 +1,12 @@
 from flask import Flask, request, render_template, session
 from pdf_utils import (
-    get_latest_pdf_filename, read_downloaded_files, write_downloaded_file,
+    read_downloaded_files, write_downloaded_file,
     read_progress, write_progress
 )
 from selenium_utils import get_current_page_number
 from config import SECRET_KEY, PDF_DIR, DOWNLOAD_DIR
 import os
 import time
-import random
 from selenium.webdriver.common.by import By
 import openpyxl
 
@@ -67,6 +66,7 @@ def index():
         with open(log_file_path, "a", encoding="utf-8") as f:
             f.write(msg)
 
+    is_paused = os.path.exists("pause.flag")
     if request.method == "GET":
         session['browser_started'] = False
 
@@ -80,25 +80,27 @@ def index():
             log += "Trình duyệt đã mở. Hãy tự login và thao tác đến đúng trang tài liệu bạn muốn tải.\n"
             log += "Khi đã ở đúng trang, quay lại đây và bấm 'Bắt đầu tải file PDF trên trang hiện tại'!"
             write_log_to_file(log)
-            return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
+            return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list, is_paused=is_paused)
 
         elif action == "pause":
             with open("pause.flag", "w") as f:
                 f.write("paused")
             log += "Đã tạm dừng quá trình tải. Bạn có thể tiếp tục bất cứ lúc nào.\n"
             write_log_to_file(log)
-            return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
+            is_paused = True
+            return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list, is_paused=is_paused)
         elif action == "resume":
             if os.path.exists("pause.flag"):
                 os.remove("pause.flag")
             log += "Tiếp tục quá trình tải...\n"
             write_log_to_file(log)
+            is_paused = False
             action = "download"
         elif action == "download":
             if driver is None:
                 log += "Lỗi: Trình duyệt chưa được mở, hãy nhấn 'Bắt đầu' trước.\n"
                 session['browser_started'] = False
-                return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
+                return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list, is_paused=is_paused)
             page_count = 1
             total_files = 0
             failed_files = 0
@@ -213,9 +215,9 @@ def index():
                 success_rate = "0%"
             log += "Đã tải xong tất cả các file PDF!\n"
             write_log_to_file(log)
-            return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
+            return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list, is_paused=is_paused)
 
-    return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
+    return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list, is_paused=is_paused)
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -1,7 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-import re
+from selenium.webdriver.support.ui import WebDriverWait
 from config import PDF_DIR
 
 def create_driver():
@@ -27,3 +27,25 @@ def get_current_page_number(driver):
         return int(el.text)
     except Exception:
         return 1 
+
+def handle_error_and_auth(driver):
+    import time
+    import os
+    log_file_path = os.path.join(os.path.dirname(__file__), 'log.txt')
+    def write_log(msg):
+        with open(log_file_path, "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+
+    from selenium.common.exceptions import TimeoutException
+    try:
+        WebDriverWait(driver, 3, poll_frequency=0.3).until(
+            lambda d: d.find_element(By.CSS_SELECTOR, "span.num-page")
+        )
+        return False
+    except TimeoutException:
+        write_log("Không tìm thấy số trang (span.num-page), có thể là trang lỗi hoặc xác thực. Đợi 30s...")
+        time.sleep(30)
+        driver.back()
+        write_log("Đã back lại trang trước từ trang lỗi, đợi 10s...")
+        time.sleep(10)
+        return True

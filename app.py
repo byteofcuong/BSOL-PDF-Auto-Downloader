@@ -1,13 +1,12 @@
 from flask import Flask, request, render_template, session
 from pdf_utils import (
-    get_latest_pdf_filename, read_downloaded_files, write_downloaded_file,
+    read_downloaded_files, write_downloaded_file,
     read_progress, write_progress
 )
 from selenium_utils import get_current_page_number
 from config import SECRET_KEY, PDF_DIR, DOWNLOAD_DIR
 import os
 import time
-import random
 from selenium.webdriver.common.by import By
 import openpyxl
 
@@ -33,7 +32,6 @@ def append_to_excel(file_name, status, ket_qua=None):
     wb.save(EXCEL_PATH)
 
 def strip_time_suffix(filename):
-    """Cắt hậu tố thời gian khỏi tên file PDF nếu có."""
     if filename.endswith('.pdf'):
         base = filename[:-4]
         idx = base.rfind('--[')
@@ -59,14 +57,13 @@ def index():
     global driver
     log = ""
     files_downloaded = 0
-    success_rate = "100%"
-    failed_files_list = []
 
     log_file_path = os.path.join(DOWNLOAD_DIR, "log.txt")
     def write_log_to_file(msg):
         with open(log_file_path, "a", encoding="utf-8") as f:
             f.write(msg)
 
+    is_paused = os.path.exists("pause.flag")
     if request.method == "GET":
         session['browser_started'] = False
 
@@ -80,29 +77,29 @@ def index():
             log += "Trình duyệt đã mở. Hãy tự login và thao tác đến đúng trang tài liệu bạn muốn tải.\n"
             log += "Khi đã ở đúng trang, quay lại đây và bấm 'Bắt đầu tải file PDF trên trang hiện tại'!"
             write_log_to_file(log)
-            return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
+            return render_template("index.html", log=log, files_downloaded=files_downloaded, is_paused=is_paused)
 
         elif action == "pause":
             with open("pause.flag", "w") as f:
                 f.write("paused")
             log += "Đã tạm dừng quá trình tải. Bạn có thể tiếp tục bất cứ lúc nào.\n"
             write_log_to_file(log)
-            return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
+            is_paused = True
+            return render_template("index.html", log=log, files_downloaded=files_downloaded, is_paused=is_paused)
         elif action == "resume":
             if os.path.exists("pause.flag"):
                 os.remove("pause.flag")
             log += "Tiếp tục quá trình tải...\n"
             write_log_to_file(log)
+            is_paused = False
             action = "download"
         elif action == "download":
             if driver is None:
                 log += "Lỗi: Trình duyệt chưa được mở, hãy nhấn 'Bắt đầu' trước.\n"
                 session['browser_started'] = False
-                return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
-            page_count = 1
+                return render_template("index.html", log=log, files_downloaded=files_downloaded, is_paused=is_paused)
             total_files = 0
             failed_files = 0
-            failed_files_list = []
             downloaded_files = read_downloaded_files()
             last_page, last_block_idx = read_progress()
             if last_page is not None and last_page > 0:
@@ -123,7 +120,10 @@ def index():
                     except Exception as e:
                         log += f"Lỗi khi chuyển trang tự động: {e}\n"
                         break
+            from selenium_utils import handle_error_and_auth
             while True:
+                if handle_error_and_auth(driver):
+                    continue
                 blocks = driver.find_elements(By.CSS_SELECTOR, "#searchResultContainer > li")
                 block_found = False
                 for idx, block in enumerate(blocks):
@@ -145,8 +145,8 @@ def index():
                         except Exception:
                             pass
                         ket_qua = None
-                        if status.lower().find("not in your subscription") != -1 or status.lower().find("không trong subscription") != -1 or status.lower().find("không được phép tải") != -1:
-                            ket_qua = ""
+                        if status.lower().find("not in subscription") != -1:
+                            ket_qua = "Không trong subscription"
                             append_to_excel(safe_file_name, status, ket_qua)
                         elif safe_file_name not in downloaded_files:
                             try:
@@ -171,14 +171,16 @@ def index():
                                     else:
                                         log += f"Không tải được file: {safe_file_name} (không tìm thấy file PDF mới phù hợp sau khi .crdownload biến mất)\n"
                                         ket_qua = "Lỗi mạng"
+                                        failed_files += 1
                                     append_to_excel(safe_file_name, status, ket_qua)
                                 else:
-                                    log += f"File {safe_file_name} không được phép tải (nút download bị disable hoặc không trong subscription).\n"
-                                    ket_qua = ""
+                                    log += f"File {safe_file_name} không được phép tải (nút download bị disable).\n"
+                                    ket_qua = "Không được phép tải"
+                                    failed_files += 1
                                     append_to_excel(safe_file_name, status, ket_qua)
                             except Exception as e_btn:
                                 log += f"Không tìm thấy hoặc không click được nút download cho {safe_file_name}: {e_btn}\n"
-                                ket_qua = "Lỗi mạng"
+                                ket_qua = "Exception khi click nút"
                                 append_to_excel(safe_file_name, status, ket_qua)
                         else:
                             log += f"File {safe_file_name} đã tải trước đó, bỏ qua.\n"
@@ -207,15 +209,11 @@ def index():
                     log += f"Không tìm thấy nút Next Page hoặc đã đến trang cuối: {e}\n"
                     break
             files_downloaded = total_files
-            if total_files > 0:
-                success_rate = f"{int(100 * (total_files - failed_files) / total_files)}%"
-            else:
-                success_rate = "0%"
             log += "Đã tải xong tất cả các file PDF!\n"
             write_log_to_file(log)
-            return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
+            return render_template("index.html", log=log, files_downloaded=files_downloaded, is_paused=is_paused)
 
-    return render_template("index.html", log=log, files_downloaded=files_downloaded, success_rate=success_rate, failed_files_list=failed_files_list)
+    return render_template("index.html", log=log, files_downloaded=files_downloaded, is_paused=is_paused)
 
 if __name__ == "__main__":
     app.run(debug=True)

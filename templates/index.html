@@ -48,16 +48,16 @@
                     </div>
                     {% if session.get('browser_started') %}
                     <div style="margin-top: 10px;">
-                        {% if not session.get('is_paused') %}
+                        {% if is_paused %}
                         <form method="POST">
-                            <button class="download-btn" type="submit" name="action" value="pause">
-                                <i class="fa-solid fa-pause icon"></i> Tạm dừng
+                            <button class="download-btn" type="submit" name="action" value="resume">
+                                <i class="fa-solid fa-play icon"></i> Tiếp tục
                             </button>
                         </form>
                         {% else %}
                         <form method="POST">
-                            <button class="download-btn" type="submit" name="action" value="resume">
-                                <i class="fa-solid fa-play icon"></i> Tiếp tục
+                            <button class="download-btn" type="submit" name="action" value="pause">
+                                <i class="fa-solid fa-pause icon"></i> Tạm dừng
                             </button>
                         </form>
                         {% endif %}

@@ -98,120 +98,139 @@ def index():
                 log += "Lỗi: Trình duyệt chưa được mở, hãy nhấn 'Bắt đầu' trước.\n"
                 session['browser_started'] = False
                 return render_template("index.html", log=log, files_downloaded=files_downloaded, is_paused=is_paused)
-            total_files = 0
-            failed_files = 0
-            downloaded_files = read_downloaded_files()
-            last_page, last_block_idx = read_progress()
-            if last_page is not None and last_page > 0:
-                current_page = get_current_page_number(driver)
-                while current_page < last_page:
+            while True:
+                total_files = 0
+                failed_files = 0
+                downloaded_files = read_downloaded_files()
+                last_page, last_block_idx = read_progress()
+                if last_page is not None and last_page > 0:
+                    current_page = get_current_page_number(driver, last_page)
+                    while current_page < last_page:
+                        try:
+                            next_btn = driver.find_element(By.ID, "next-page")
+                            if not next_btn.is_enabled() or 'disabled' in (next_btn.get_attribute("class") or "").lower():
+                                log += "Không thể chuyển tiếp, đã đến trang cuối hoặc nút Next bị disable.\n"
+                                break
+                            next_btn.click()
+                            for _ in range(30):
+                                time.sleep(5)
+                                new_page = get_current_page_number(driver, current_page)
+                                if new_page != current_page:
+                                    break
+                            current_page = get_current_page_number(driver, current_page)
+                        except Exception as e:
+                            log += f"Lỗi khi chuyển trang tự động: {e}\n"
+                            break
+                from selenium_utils import handle_error_and_auth
+                reload_all = False
+                while True:
+                    if handle_error_and_auth(driver):
+                        reload_all = True
+                        break
+                    blocks = driver.find_elements(By.CSS_SELECTOR, "#searchResultContainer > li")
+                    block_found = False
+                    for idx, block in enumerate(blocks):
+                        while os.path.exists("pause.flag"):
+                            log += "\nĐang tạm dừng..."
+                            time.sleep(5)
+                        current_page = get_current_page_number(driver, last_page)
+                        if last_page == current_page and idx <= last_block_idx:
+                            continue
+                        block_found = True
+                        try:
+                            file_name = block.find_element(By.CSS_SELECTOR, "a.srch-result").text.strip() + ".pdf"
+                        except Exception:
+                            file_name = "unknown.pdf"
+                            # pass
+                        safe_file_name = file_name.replace("/", "-").replace("\\", "-").replace(":", "-").replace("*", "-").replace("?", "-").replace("\"", "'").replace("<", "(").replace(">", ")").replace("|", "-")
+                        try:
+                            status = ""
+                            try:
+                                status = block.find_element(By.CSS_SELECTOR, ".srch-rsl-subscribed, .srch-rsl-unsubscribed").text.strip()
+                            except Exception:
+                                pass
+                            ket_qua = None
+                            if status.lower().find("not in subscription") != -1:
+                                ket_qua = "Không trong subscription"
+                                append_to_excel(safe_file_name, status, ket_qua)
+                            elif safe_file_name not in downloaded_files:
+                                try:
+                                    before_files = set(f for f in os.listdir(PDF_DIR) if f.lower().endswith(".pdf") or f.lower().endswith(".crdownload"))
+                                    btn = block.find_element(By.CSS_SELECTOR, "input.download-pdf")
+                                    if btn.is_enabled() and not btn.get_attribute("disabled"):
+                                        btn.click()
+                                        pdf_file = wait_for_pdf_download(before_files, PDF_DIR, safe_file_name, timeout=60)
+                                        if pdf_file:
+                                            latest_path = os.path.join(PDF_DIR, pdf_file)
+                                            new_path = os.path.join(PDF_DIR, safe_file_name)
+                                            try:
+                                                os.rename(latest_path, new_path)
+                                                downloaded_files.add(safe_file_name)
+                                                write_downloaded_file(safe_file_name)
+                                                total_files += 1
+                                                ket_qua = "Có"
+                                                log += f"Đã tải thành công: {safe_file_name}\n"
+                                            except Exception as e_rename:
+                                                log += f"Không đổi tên được file {pdf_file} thành {safe_file_name}: {e_rename}\n"
+                                                ket_qua = "Lỗi mạng"
+                                        else:
+                                            log += f"Không tải được file: {safe_file_name} (không tìm thấy file PDF mới phù hợp sau khi .crdownload biến mất)\n"
+                                            ket_qua = "Lỗi mạng"
+                                            failed_files += 1
+                                        append_to_excel(safe_file_name, status, ket_qua)
+                                    else:
+                                        log += f"File {safe_file_name} không được phép tải (nút download bị disable).\n"
+                                        ket_qua = "Không được phép tải"
+                                        failed_files += 1
+                                        append_to_excel(safe_file_name, status, ket_qua)
+                                except Exception as e_btn:
+                                    log += f"Không tìm thấy hoặc không click được nút download cho {safe_file_name}: {e_btn}\n"
+                                    ket_qua = "Exception khi click nút"
+                                    # append_to_excel(safe_file_name, status, ket_qua)
+                                    write_progress(last_page, idx - 5)
+                                    from selenium_utils import handle_error_and_auth
+                                    if handle_error_and_auth(driver):
+                                        reload_all = True
+                                        break
+                            else:
+                                log += f"File {safe_file_name} đã tải trước đó, bỏ qua.\n"
+                                ket_qua = "Có"
+                                append_to_excel(safe_file_name, status, ket_qua)
+                            current_page = get_current_page_number(driver, last_page)
+                            write_progress(current_page, idx)
+                        except Exception as e:
+                            log += f"Lỗi không xác định với block: {e}\n"
+                            append_to_excel(safe_file_name, "Lỗi không xác định", "Lỗi mạng")
+                        if reload_all:
+                            break
+                    if reload_all:
+                        break
+                    if not block_found:
+                        log += "Không còn block cha nào để tải trên trang này.\n"
                     try:
                         next_btn = driver.find_element(By.ID, "next-page")
-                        if not next_btn.is_enabled() or 'disabled' in (next_btn.get_attribute("class") or "").lower():
-                            log += "Không thể chuyển tiếp, đã đến trang cuối hoặc nút Next bị disable.\n"
-                            break
-                        next_btn.click()
-                        for _ in range(30):
+                        if next_btn.is_enabled() and 'disabled' not in (next_btn.get_attribute("class") or "").lower():
+                            next_btn.click()
                             time.sleep(5)
-                            new_page = get_current_page_number(driver)
-                            if new_page != current_page:
-                                break
-                        current_page = get_current_page_number(driver)
-                    except Exception as e:
-                        log += f"Lỗi khi chuyển trang tự động: {e}\n"
-                        break
-            from selenium_utils import handle_error_and_auth
-            while True:
-                if handle_error_and_auth(driver):
-                    continue
-                blocks = driver.find_elements(By.CSS_SELECTOR, "#searchResultContainer > li")
-                block_found = False
-                for idx, block in enumerate(blocks):
-                    while os.path.exists("pause.flag"):
-                        log += "\nĐang tạm dừng..."
-                        time.sleep(5)
-                    if last_page == get_current_page_number(driver) and idx <= last_block_idx:
-                        continue
-                    block_found = True
-                    try:
-                        file_name = block.find_element(By.CSS_SELECTOR, "a.srch-result").text.strip() + ".pdf"
-                    except Exception:
-                        file_name = "unknown.pdf"
-                    safe_file_name = file_name.replace("/", "-").replace("\\", "-").replace(":", "-").replace("*", "-").replace("?", "-").replace("\"", "'").replace("<", "(").replace(">", ")").replace("|", "-")
-                    try:
-                        status = ""
-                        try:
-                            status = block.find_element(By.CSS_SELECTOR, ".srch-rsl-subscribed, .srch-rsl-unsubscribed").text.strip()
-                        except Exception:
-                            pass
-                        ket_qua = None
-                        if status.lower().find("not in subscription") != -1:
-                            ket_qua = "Không trong subscription"
-                            append_to_excel(safe_file_name, status, ket_qua)
-                        elif safe_file_name not in downloaded_files:
-                            try:
-                                before_files = set(f for f in os.listdir(PDF_DIR) if f.lower().endswith(".pdf") or f.lower().endswith(".crdownload"))
-                                btn = block.find_element(By.CSS_SELECTOR, "input.download-pdf")
-                                if btn.is_enabled() and not btn.get_attribute("disabled"):
-                                    btn.click()
-                                    pdf_file = wait_for_pdf_download(before_files, PDF_DIR, safe_file_name, timeout=60)
-                                    if pdf_file:
-                                        latest_path = os.path.join(PDF_DIR, pdf_file)
-                                        new_path = os.path.join(PDF_DIR, safe_file_name)
-                                        try:
-                                            os.rename(latest_path, new_path)
-                                            downloaded_files.add(safe_file_name)
-                                            write_downloaded_file(safe_file_name)
-                                            total_files += 1
-                                            ket_qua = "Có"
-                                            log += f"Đã tải thành công: {safe_file_name}\n"
-                                        except Exception as e_rename:
-                                            log += f"Không đổi tên được file {pdf_file} thành {safe_file_name}: {e_rename}\n"
-                                            ket_qua = "Lỗi mạng"
-                                    else:
-                                        log += f"Không tải được file: {safe_file_name} (không tìm thấy file PDF mới phù hợp sau khi .crdownload biến mất)\n"
-                                        ket_qua = "Lỗi mạng"
-                                        failed_files += 1
-                                    append_to_excel(safe_file_name, status, ket_qua)
-                                else:
-                                    log += f"File {safe_file_name} không được phép tải (nút download bị disable).\n"
-                                    ket_qua = "Không được phép tải"
-                                    failed_files += 1
-                                    append_to_excel(safe_file_name, status, ket_qua)
-                            except Exception as e_btn:
-                                log += f"Không tìm thấy hoặc không click được nút download cho {safe_file_name}: {e_btn}\n"
-                                ket_qua = "Exception khi click nút"
-                                append_to_excel(safe_file_name, status, ket_qua)
+                            current_page = get_current_page_number(driver, last_page)
+                            write_progress(current_page, -1)
+                            last_page = current_page
+                            last_block_idx = -1
+                            log += "Chuyển sang trang tiếp theo...\n"
+                            continue
                         else:
-                            log += f"File {safe_file_name} đã tải trước đó, bỏ qua.\n"
-                            ket_qua = "Có"
-                            append_to_excel(safe_file_name, status, ket_qua)
-                        write_progress(get_current_page_number(driver), idx)
+                            log += "Đã đến trang cuối, không còn trang nào để chuyển tiếp.\n"
+                            break
                     except Exception as e:
-                        log += f"Lỗi không xác định với block: {e}\n"
-                        append_to_excel(safe_file_name, "Lỗi không xác định", "Lỗi mạng")
-                if not block_found:
-                    log += "Không còn block cha nào để tải trên trang này.\n"
-                try:
-                    next_btn = driver.find_element(By.ID, "next-page")
-                    if next_btn.is_enabled() and 'disabled' not in (next_btn.get_attribute("class") or "").lower():
-                        next_btn.click()
-                        time.sleep(5)
-                        write_progress(get_current_page_number(driver), -1)
-                        last_page = get_current_page_number(driver)
-                        last_block_idx = -1
-                        log += "Chuyển sang trang tiếp theo...\n"
-                        continue
-                    else:
-                        log += "Đã đến trang cuối, không còn trang nào để chuyển tiếp.\n"
+                        log += f"Không tìm thấy nút Next Page hoặc đã đến trang cuối: {e}\n"
                         break
-                except Exception as e:
-                    log += f"Không tìm thấy nút Next Page hoặc đã đến trang cuối: {e}\n"
-                    break
-            files_downloaded = total_files
-            log += "Đã tải xong tất cả các file PDF!\n"
-            write_log_to_file(log)
-            return render_template("index.html", log=log, files_downloaded=files_downloaded, is_paused=is_paused)
+                if reload_all:
+                    continue
+                files_downloaded = total_files
+                log += "Đã tải xong tất cả các file PDF!\n"
+                write_log_to_file(log)
+                write_progress(current_page, -1)
+                return render_template("index.html", log=log, files_downloaded=files_downloaded, is_paused=is_paused)
 
     return render_template("index.html", log=log, files_downloaded=files_downloaded, is_paused=is_paused)
 

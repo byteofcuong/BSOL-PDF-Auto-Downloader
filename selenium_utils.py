@@ -21,12 +21,12 @@ def get_pdf_buttons_hash(driver):
     pdf_buttons = driver.find_elements(By.CSS_SELECTOR, "input.download-pdf")
     return hash(tuple([btn.get_attribute('outerHTML') for btn in pdf_buttons]))
 
-def get_current_page_number(driver):
+def get_current_page_number(driver, old_page_number=None):
     try:
         el = driver.find_element(By.CSS_SELECTOR, "span.num-page")
         return int(el.text)
     except Exception:
-        return 1 
+        return old_page_number
 
 def handle_error_and_auth(driver):
     import time
@@ -43,9 +43,9 @@ def handle_error_and_auth(driver):
         )
         return False
     except TimeoutException:
-        write_log("Không tìm thấy số trang (span.num-page), có thể là trang lỗi hoặc xác thực. Đợi 30s...")
+        # write_log("Không tìm thấy số trang (span.num-page), có thể là trang lỗi hoặc xác thực. Đợi 30s...")
         time.sleep(30)
         driver.back()
-        write_log("Đã back lại trang trước từ trang lỗi, đợi 10s...")
+        # write_log("Đã back lại trang trước từ trang lỗi, đợi 10s...")
         time.sleep(10)
         return True

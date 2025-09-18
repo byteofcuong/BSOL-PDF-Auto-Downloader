@@ -6,7 +6,9 @@ from config import PDF_DIR
 
 def create_driver():
     options = Options()
-    options.binary_location = r"C:\\Users\\Laptop Lenovo\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe"
+    from config import CHROME_PATH
+    if CHROME_PATH:
+        options.binary_location = CHROME_PATH
     prefs = {
         "download.default_directory": PDF_DIR,
         "download.prompt_for_download": False,

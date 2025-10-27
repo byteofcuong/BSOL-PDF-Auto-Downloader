@@ -1,5 +1,5 @@
 import os
-from config import PDF_DIR, DOWNLOADED_FILES_PATH, CHECKSUMS_PATH, PROGRESS_PATH
+from config import PDF_DIR, DOWNLOADED_FILES_PATH, PROGRESS_PATH
 
 def get_latest_pdf_filename():
     pdf_files = [f for f in os.listdir(PDF_DIR) if f.lower().endswith(".pdf")]

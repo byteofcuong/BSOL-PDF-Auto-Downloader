@@ -3,7 +3,7 @@ from pdf_utils import (
     read_downloaded_files, write_downloaded_file,
     read_progress, write_progress
 )
-from selenium_utils import get_current_page_number
+from selenium_utils import get_current_page_number, handle_error_and_auth
 from config import SECRET_KEY, PDF_DIR, DOWNLOAD_DIR
 import os
 import time
@@ -48,6 +48,7 @@ def wait_for_pdf_download(before_files, pdf_dir, safe_file_name, timeout=30):
         if new_files:
             newest_file = max(new_files, key=lambda f: os.path.getctime(os.path.join(pdf_dir, f)))
             if strip_time_suffix(newest_file) == safe_file_name:
+                time.sleep(3)
                 return newest_file
         time.sleep(3)
     return None
@@ -121,15 +122,43 @@ def index():
                         except Exception as e:
                             log += f"Lỗi khi chuyển trang tự động: {e}\n"
                             break
-                from selenium_utils import handle_error_and_auth
                 reload_all = False
                 while True:
                     if handle_error_and_auth(driver):
                         reload_all = True
                         break
+                    
+                    try:
+                        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                        time.sleep(2)
+                        driver.execute_script("window.scrollTo(0, 0);")
+                        time.sleep(1)
+                    except Exception:
+                        pass
+                    
+                    if handle_error_and_auth(driver):
+                        reload_all = True
+                        break
+                    
                     blocks = driver.find_elements(By.CSS_SELECTOR, "#searchResultContainer > li")
+                    log += f"Tìm thấy {len(blocks)} blocks trên trang hiện tại.\n"
+                    
+                    if handle_error_and_auth(driver):
+                        reload_all = True
+                        break
+                    
+                    actual_doc_blocks = []
+                    for i, block in enumerate(blocks):
+                        try:
+                            block.find_element(By.CSS_SELECTOR, "a.srch-result, a[href*='BibliographicInfoData']")
+                            actual_doc_blocks.append((i, block))
+                        except:
+                            pass
+                    
+                    log += f"Trong đó có {len(actual_doc_blocks)} blocks chứa tài liệu thực sự.\n"
                     block_found = False
-                    for idx, block in enumerate(blocks):
+                    for original_idx, block in actual_doc_blocks:
+                        idx = original_idx
                         while os.path.exists("pause.flag"):
                             log += "\nĐang tạm dừng..."
                             time.sleep(5)
@@ -138,10 +167,29 @@ def index():
                             continue
                         block_found = True
                         try:
-                            file_name = block.find_element(By.CSS_SELECTOR, "a.srch-result").text.strip() + ".pdf"
-                        except Exception:
-                            file_name = "unknown.pdf"
-                            # pass
+                            file_name = None
+                            selectors = [
+                                "a.srch-result",
+                                ".srch-result", 
+                                "a[href*='BibliographicInfoData']",
+                                ".inner-search-result-list a"
+                            ]
+                            
+                            for selector in selectors:
+                                try:
+                                    element = block.find_element(By.CSS_SELECTOR, selector)
+                                    file_name = element.text.strip() + ".pdf"
+                                    break
+                                except:
+                                    continue
+                            
+                            if not file_name:
+                                log += f"Không tìm thấy tên file ở block {idx}, bỏ qua.\n"
+                                continue
+                                
+                        except Exception as e:
+                            log += f"Lỗi đọc tên file ở block {idx}: {e}, bỏ qua.\n"
+                            continue
                         safe_file_name = file_name.replace("/", "-").replace("\\", "-").replace(":", "-").replace("*", "-").replace("?", "-").replace("\"", "'").replace("<", "(").replace(">", ")").replace("|", "-")
                         try:
                             status = ""
@@ -156,9 +204,33 @@ def index():
                             elif safe_file_name not in downloaded_files:
                                 try:
                                     before_files = set(f for f in os.listdir(PDF_DIR) if f.lower().endswith(".pdf") or f.lower().endswith(".crdownload"))
-                                    btn = block.find_element(By.CSS_SELECTOR, "input.download-pdf")
+                                    
+                                    btn = None
+                                    btn_selectors = [
+                                        "input.download-pdf",
+                                        "input[value*='Download PDF']",
+                                        ".download-pdf",
+                                        "input[title*='Download PDF']"
+                                    ]
+                                    
+                                    for btn_selector in btn_selectors:
+                                        try:
+                                            btn = block.find_element(By.CSS_SELECTOR, btn_selector)
+                                            break
+                                        except:
+                                            continue
+                                    
+                                    if not btn:
+                                        log += f"Không tìm thấy nút download cho {safe_file_name}.\n"
+                                        ket_qua = "Không có nút download"
+                                        append_to_excel(safe_file_name, status, ket_qua)
+                                        continue
                                     if btn.is_enabled() and not btn.get_attribute("disabled"):
                                         btn.click()
+                                        time.sleep(1)
+                                        if handle_error_and_auth(driver):
+                                            reload_all = True
+                                            break
                                         pdf_file = wait_for_pdf_download(before_files, PDF_DIR, safe_file_name, timeout=60)
                                         if pdf_file:
                                             latest_path = os.path.join(PDF_DIR, pdf_file)
@@ -186,9 +258,7 @@ def index():
                                 except Exception as e_btn:
                                     log += f"Không tìm thấy hoặc không click được nút download cho {safe_file_name}: {e_btn}\n"
                                     ket_qua = "Exception khi click nút"
-                                    # append_to_excel(safe_file_name, status, ket_qua)
                                     write_progress(last_page, idx - 5)
-                                    from selenium_utils import handle_error_and_auth
                                     if handle_error_and_auth(driver):
                                         reload_all = True
                                         break
@@ -212,6 +282,9 @@ def index():
                         if next_btn.is_enabled() and 'disabled' not in (next_btn.get_attribute("class") or "").lower():
                             next_btn.click()
                             time.sleep(5)
+                            if handle_error_and_auth(driver):
+                                reload_all = True
+                                break
                             current_page = get_current_page_number(driver, last_page)
                             write_progress(current_page, -1)
                             last_page = current_page

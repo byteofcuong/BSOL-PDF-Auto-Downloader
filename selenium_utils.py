@@ -6,7 +6,7 @@ from config import PDF_DIR
 
 def create_driver():
     options = Options()
-    #options.binary_location = r"C:\\Users\\Laptop Lenovo\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe"
+    #options.binary_location = r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
     options.binary_location = r"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     prefs = {
         "download.default_directory": PDF_DIR,
@@ -31,12 +31,6 @@ def get_current_page_number(driver, old_page_number=None):
 
 def handle_error_and_auth(driver):
     import time
-    import os
-    log_file_path = os.path.join(os.path.dirname(__file__), 'log.txt')
-    def write_log(msg):
-        with open(log_file_path, "a", encoding="utf-8") as f:
-            f.write(msg + "\n")
-
     from selenium.common.exceptions import TimeoutException
     try:
         WebDriverWait(driver, 3, poll_frequency=0.3).until(
@@ -44,9 +38,7 @@ def handle_error_and_auth(driver):
         )
         return False
     except TimeoutException:
-        # write_log("Không tìm thấy số trang (span.num-page), có thể là trang lỗi hoặc xác thực. Đợi 30s...")
         time.sleep(30)
         driver.back()
-        # write_log("Đã back lại trang trước từ trang lỗi, đợi 10s...")
         time.sleep(10)
         return True

@@ -6,5 +6,4 @@ DOWNLOAD_DIR = os.path.join(DOWNLOADS_PATH, 'BSOL Downloads')
 
 PDF_DIR = os.path.join(DOWNLOAD_DIR, "PDFs")
 DOWNLOADED_FILES_PATH = os.path.join(DOWNLOAD_DIR, "downloaded_files.txt")
-CHECKSUMS_PATH = os.path.join(DOWNLOAD_DIR, "checksums.txt")
-PROGRESS_PATH = os.path.join(DOWNLOAD_DIR, "progress.txt") 
+PROGRESS_PATH = os.path.join(DOWNLOAD_DIR, "progress.txt")

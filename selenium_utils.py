@@ -6,8 +6,8 @@ from config import PDF_DIR
 
 def create_driver():
     options = Options()
-    #options.binary_location = r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-    options.binary_location = r"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    options.binary_location = r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+    #options.binary_location = r"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     prefs = {
         "download.default_directory": PDF_DIR,
         "download.prompt_for_download": False,

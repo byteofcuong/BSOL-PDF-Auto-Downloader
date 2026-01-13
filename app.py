@@ -39,7 +39,7 @@ def strip_time_suffix(filename):
             return base[:idx] + '.pdf'
     return filename
 
-def wait_for_pdf_download(before_files, pdf_dir, safe_file_name, timeout=30):
+def wait_for_pdf_download(before_files, pdf_dir, safe_file_name, timeout=20):
     import time, os
     start = time.time()
     while time.time() - start < timeout:
@@ -197,6 +197,27 @@ def index():
                                 status = block.find_element(By.CSS_SELECTOR, ".srch-rsl-subscribed, .srch-rsl-unsubscribed").text.strip()
                             except Exception:
                                 pass
+
+                            try:
+                                standards_element = block.find_element(By.CSS_SELECTOR, ".standards, li.standards")
+                                standards_text = standards_element.text
+                                
+                                exclusion_reason = None
+                                if "Tracked Changes" in standards_text:
+                                    exclusion_reason = "Tracked Changes"
+                                elif "Draft" in standards_text:
+                                    exclusion_reason = "Draft"
+                                    
+                                if exclusion_reason:
+                                    log += f"Bỏ qua: {safe_file_name} do chứa từ khóa '{exclusion_reason}'.\n"
+                                    append_to_excel(safe_file_name, status, exclusion_reason)
+                                    
+                                    current_page = get_current_page_number(driver, last_page)
+                                    write_progress(current_page, original_idx)
+                                    continue 
+                            except Exception:
+                                pass
+
                             ket_qua = None
                             if status.lower().find("not in subscription") != -1:
                                 ket_qua = "Không trong subscription"
@@ -231,7 +252,7 @@ def index():
                                         if handle_error_and_auth(driver):
                                             reload_all = True
                                             break
-                                        pdf_file = wait_for_pdf_download(before_files, PDF_DIR, safe_file_name, timeout=60)
+                                        pdf_file = wait_for_pdf_download(before_files, PDF_DIR, safe_file_name, timeout=20)
                                         if pdf_file:
                                             latest_path = os.path.join(PDF_DIR, pdf_file)
                                             new_path = os.path.join(PDF_DIR, safe_file_name)
